@@ -69,6 +69,9 @@ class AzureContentUnderstandingClient:
         ".heif",
     ]  # Pro mode and Training for Standard mode only support document data
 
+    # Maximum number of pages to retrieve when following pagination links
+    MAX_PAGINATION_PAGES: int = 1000
+
     def __init__(
         self,
         endpoint: str,
@@ -284,21 +287,58 @@ class AzureContentUnderstandingClient:
         Retrieves a list of all available analyzers from the content understanding service.
 
         This method sends a GET request to the service endpoint to fetch the list of analyzers.
+        It automatically follows pagination links (nextLink) to retrieve all pages of results.
         It raises an HTTPError if the request fails.
 
         Returns:
             dict: A dictionary containing the JSON response from the service, which includes
-                  the list of available analyzers.
+                  the complete list of available analyzers across all pages in the "value" key.
 
         Raises:
             requests.exceptions.HTTPError: If the HTTP request returned an unsuccessful status code.
+            RuntimeError: If too many pages are encountered (likely indicating a pagination loop).
+            ValueError: If the API response contains an invalid 'value' field (not a list).
         """
-        response = requests.get(
-            url=self._get_analyzer_list_url(self._endpoint, self._api_version),
-            headers=self._headers,
-        )
-        self._raise_for_status_with_detail(response)
-        return response.json()
+        all_analyzers = []
+        url = self._get_analyzer_list_url(self._endpoint, self._api_version)
+        visited_urls = set()
+        page_count = 0
+        
+        while url:
+            # Prevent infinite loops from circular pagination links
+            if url in visited_urls:
+                raise RuntimeError(f"Circular pagination detected: {url} was already visited")
+            
+            visited_urls.add(url)
+            page_count += 1
+            
+            # Check page count after incrementing to properly enforce limit
+            if page_count > self.MAX_PAGINATION_PAGES:
+                raise RuntimeError(
+                    f"Maximum pagination limit ({self.MAX_PAGINATION_PAGES} pages) exceeded. "
+                    f"This likely indicates a pagination loop or misconfiguration."
+                )
+            
+            response = requests.get(url=url, headers=self._headers)
+            self._raise_for_status_with_detail(response)
+            response_json = response.json()
+            
+            # Collect analyzers from current page
+            analyzers = response_json.get("value", [])
+            if not isinstance(analyzers, list):
+                # Include structure info without potentially sensitive response content
+                structure_keys = list(response_json.keys()) if isinstance(response_json, dict) else []
+                raise ValueError(
+                    f"Expected 'value' to be a list, got {type(analyzers).__name__}. "
+                    f"Response contains keys: {structure_keys}"
+                )
+            all_analyzers.extend(analyzers)
+            
+            # Get the next page URL, if it exists
+            url = response_json.get("nextLink")
+        
+        # Return in the same format as the original response
+        return {"value": all_analyzers}
 
     def get_defaults(self) -> Dict[str, Any]:
         """
