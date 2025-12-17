@@ -33,7 +33,7 @@ class ReferenceDocItem:
 
 class AzureContentUnderstandingClient:
 
-    PREBUILT_DOCUMENT_ANALYZER_ID: str = "prebuilt-documentAnalyzer"
+    PREBUILT_DOCUMENT_ANALYZER_ID: str = "prebuilt-documentSearch"
     OCR_RESULT_FILE_SUFFIX: str = ".result.json"
     LABEL_FILE_SUFFIX: str = ".labels.json"
     KNOWLEDGE_SOURCE_LIST_FILE_NAME: str = "sources.jsonl"
@@ -69,6 +69,9 @@ class AzureContentUnderstandingClient:
         ".heif",
     ]  # Pro mode and Training for Standard mode only support document data
 
+    # Maximum number of pages to retrieve when following pagination links
+    MAX_PAGINATION_PAGES: int = 1000
+
     def __init__(
         self,
         endpoint: str,
@@ -103,6 +106,9 @@ class AzureContentUnderstandingClient:
     def _get_analyze_url(self, endpoint: str, api_version: str, analyzer_id: str) -> str:
         return f"{endpoint}/contentunderstanding/analyzers/{analyzer_id}:analyze?api-version={api_version}"  # noqa
 
+    def _get_analyze_binary_url(self, endpoint: str, api_version: str, analyzer_id: str) -> str:
+        return f"{endpoint}/contentunderstanding/analyzers/{analyzer_id}:analyzeBinary?api-version={api_version}"  # noqa
+
     def _get_training_data_config(
         self, storage_container_sas_url: str, storage_container_path_prefix: str
     ) -> Dict[str, str]:
@@ -128,6 +134,9 @@ class AzureContentUnderstandingClient:
     def _get_classify_url(self, endpoint: str, api_version: str, classifier_id: str) -> str:
         return f"{endpoint}/contentunderstanding/classifiers/{classifier_id}:classify?api-version={api_version}"
 
+    def _get_defaults_url(self, endpoint: str, api_version: str) -> str:
+        return f"{endpoint}/contentunderstanding/defaults?api-version={api_version}"
+
     def _get_headers(
         self, subscription_key: str, api_token: str, x_ms_useragent: str
     ) -> Dict[str, str]:
@@ -146,6 +155,53 @@ class AzureContentUnderstandingClient:
         )
         headers["x-ms-useragent"] = x_ms_useragent
         return headers
+    
+    def _raise_for_status_with_detail(self, response: Response) -> None:
+        """
+        Raises HTTPError with detailed error information from the response.
+        
+        Args:
+            response: The HTTP response object to check
+            
+        Raises:
+            requests.exceptions.HTTPError: If the response status indicates an error,
+                with additional context from the response body
+        """
+        if response.ok:
+            return
+        
+        try:
+            # Try to extract error details from response body
+            error_detail = ""
+            try:
+                error_json = response.json()
+                if "error" in error_json:
+                    error_info = error_json["error"]
+                    error_code = error_info.get("code", "Unknown")
+                    error_message = error_info.get("message", "No message provided")
+                    error_detail = f"\n  Error Code: {error_code}\n  Error Message: {error_message}"
+                    
+                    # Include additional details if available
+                    if "details" in error_info:
+                        error_detail += f"\n  Details: {error_info['details']}"
+                    if "innererror" in error_info:
+                        error_detail += f"\n  Inner Error: {error_info['innererror']}"
+                else:
+                    error_detail = f"\n  Response Body: {json.dumps(error_json, indent=2)}"
+            except (ValueError, json.JSONDecodeError):
+                # If response is not JSON, include raw text
+                if response.text:
+                    error_detail = f"\n  Response Text: {response.text[:500]}"
+        except Exception:
+            # If anything goes wrong parsing the error, just continue with basic error
+            error_detail = ""
+        
+        # Create detailed error message
+        error_msg = f"{response.status_code} {response.reason} for url: {response.url}{error_detail}"
+        
+        # Raise HTTPError with the detailed message
+        http_error = requests.exceptions.HTTPError(error_msg, response=response)
+        raise http_error
     
     @staticmethod
     def is_supported_doc_type_by_file_ext(file_ext: str, is_document: bool=False) -> bool:
@@ -231,20 +287,120 @@ class AzureContentUnderstandingClient:
         Retrieves a list of all available analyzers from the content understanding service.
 
         This method sends a GET request to the service endpoint to fetch the list of analyzers.
+        It automatically follows pagination links (nextLink) to retrieve all pages of results.
         It raises an HTTPError if the request fails.
 
         Returns:
             dict: A dictionary containing the JSON response from the service, which includes
-                  the list of available analyzers.
+                  the complete list of available analyzers across all pages in the "value" key.
+
+        Raises:
+            requests.exceptions.HTTPError: If the HTTP request returned an unsuccessful status code.
+            RuntimeError: If too many pages are encountered (likely indicating a pagination loop).
+            ValueError: If the API response contains an invalid 'value' field (not a list).
+        """
+        all_analyzers = []
+        url = self._get_analyzer_list_url(self._endpoint, self._api_version)
+        visited_urls = set()
+        page_count = 0
+        
+        while url:
+            # Prevent infinite loops from circular pagination links
+            if url in visited_urls:
+                raise RuntimeError(f"Circular pagination detected: {url} was already visited")
+            
+            visited_urls.add(url)
+            page_count += 1
+            
+            # Check page count after incrementing to properly enforce limit
+            if page_count > self.MAX_PAGINATION_PAGES:
+                raise RuntimeError(
+                    f"Maximum pagination limit ({self.MAX_PAGINATION_PAGES} pages) exceeded. "
+                    f"This likely indicates a pagination loop or misconfiguration."
+                )
+            
+            response = requests.get(url=url, headers=self._headers)
+            self._raise_for_status_with_detail(response)
+            response_json = response.json()
+            
+            # Collect analyzers from current page
+            analyzers = response_json.get("value", [])
+            if not isinstance(analyzers, list):
+                # Include structure info without potentially sensitive response content
+                structure_keys = list(response_json.keys()) if isinstance(response_json, dict) else []
+                raise ValueError(
+                    f"Expected 'value' to be a list, got {type(analyzers).__name__}. "
+                    f"Response contains keys: {structure_keys}"
+                )
+            all_analyzers.extend(analyzers)
+            
+            # Get the next page URL, if it exists
+            url = response_json.get("nextLink")
+        
+        # Return in the same format as the original response
+        return {"value": all_analyzers}
+
+    def get_defaults(self) -> Dict[str, Any]:
+        """
+        Retrieves the current default settings for the Content Understanding resource.
+
+        This method sends a GET request to the service endpoint to fetch the default
+        model deployment mappings.
+
+        Returns:
+            dict: A dictionary containing the default settings, including modelDeployments.
+                  Example: {"modelDeployments": {"gpt-4.1": "myGpt41Deployment", ...}}
 
         Raises:
             requests.exceptions.HTTPError: If the HTTP request returned an unsuccessful status code.
         """
         response = requests.get(
-            url=self._get_analyzer_list_url(self._endpoint, self._api_version),
+            url=self._get_defaults_url(self._endpoint, self._api_version),
             headers=self._headers,
         )
-        response.raise_for_status()
+        self._raise_for_status_with_detail(response)
+        return response.json()
+
+    def update_defaults(self, model_deployments: Dict[str, Optional[str]]) -> Dict[str, Any]:
+        """
+        Updates the default model deployment mappings for the Content Understanding resource.
+
+        This is a PATCH operation using application/merge-patch+json. You can update individual
+        model deployments without sending the entire object. Any keys you include will be
+        added/updated. You can remove keys by setting them to None.
+
+        Args:
+            model_deployments (Dict[str, Optional[str]]): A dictionary mapping model names to
+                deployment names. Set a value to None to remove that mapping.
+                Example: {"gpt-4.1": "myGpt41Deployment", "gpt-4o": "eastus-gpt4o-deployment"}
+
+        Returns:
+            dict: A dictionary containing the updated default settings.
+
+        Raises:
+            requests.exceptions.HTTPError: If the HTTP request returned an unsuccessful status code.
+
+        Example:
+            # Update specific deployments
+            client.update_defaults({
+                "gpt-4o": "new-deployment-name",
+                "text-embedding-3-large": "myTextEmbedding3LargeDeployment"
+            })
+
+            # Remove a deployment mapping
+            client.update_defaults({"gpt-4.1": None})
+        """
+        headers = self._headers.copy()
+        headers["Content-Type"] = "application/merge-patch+json"
+
+        body = {"modelDeployments": model_deployments}
+
+        response = requests.patch(
+            url=self._get_defaults_url(self._endpoint, self._api_version),
+            headers=headers,
+            json=body,
+        )
+        self._raise_for_status_with_detail(response)
         return response.json()
 
     def get_analyzer_detail_by_id(self, analyzer_id: str) -> Dict[str, Any]:
@@ -265,7 +421,7 @@ class AzureContentUnderstandingClient:
             url=self._get_analyzer_url(self._endpoint, self._api_version, analyzer_id),
             headers=self._headers,
         )
-        response.raise_for_status()
+        self._raise_for_status_with_detail(response)
         return response.json()
 
     def begin_create_analyzer(
@@ -332,7 +488,7 @@ class AzureContentUnderstandingClient:
             headers=headers,
             json=analyzer_template,
         )
-        response.raise_for_status()
+        self._raise_for_status_with_detail(response)
         self._logger.info(f"Analyzer {analyzer_id} create request accepted.")
         return response
 
@@ -353,79 +509,91 @@ class AzureContentUnderstandingClient:
             url=self._get_analyzer_url(self._endpoint, self._api_version, analyzer_id),
             headers=self._headers,
         )
-        response.raise_for_status()
-        self._logger.info(f"Analyzer {analyzer_id} deleted.")
+        self._raise_for_status_with_detail(response)
+        self._logger.info(f"Deleting analyzer: {analyzer_id}")
         return response
 
-    def begin_analyze(self, analyzer_id: str, file_location: str) -> Response:
+    def begin_analyze_url(self, analyzer_id: str, url: str) -> Response:
         """
-        Begins the analysis of a file or URL using the specified analyzer.
+        Begins the analysis of a document from a URL using the specified analyzer.
+        Uses the :analyze endpoint for URL-based analysis.
 
         Args:
             analyzer_id (str): The ID of the analyzer to use.
-            file_location (str): The local path to the file or the URL to analyze.
+            url (str): The URL of the document to analyze.
 
         Returns:
             Response: The response from the analysis request.
 
         Raises:
-            ValueError: If the file location is not a valid path or URL.
+            ValueError: If the URL is not valid.
             HTTPError: If the HTTP request returned an unsuccessful status code.
         """
-        data = None
-        file_path = Path(file_location)
-        if file_path.exists():
-            if file_path.is_dir():
-                # Only Pro mode supports multiple input files
-                data = {
-                    "inputs": [
-                        {
-                            "name": "_".join(f.relative_to(file_path).parts),  # flatten the relative file path into a single string using underscores
-                            "data": base64.b64encode(f.read_bytes()).decode("utf-8")
-                        }
-                        for f in file_path.rglob("*")
-                        if f.is_file() and self.is_supported_doc_type_by_file_path(f, is_document=True)
-                    ]
-                }
-                headers = {"Content-Type": "application/json"}
-            elif file_path.is_file():
-                with open(file_location, "rb") as file:
-                    data = file.read()
-                headers = {"Content-Type": "application/octet-stream"}
-            else:
-                raise ValueError("File location must be a valid and supported file or directory path.")
-        elif "https://" in file_location or "http://" in file_location:
-            data = {"url": file_location}
-            headers = {"Content-Type": "application/json"}
-        else:
-            raise ValueError("File location must be a valid path or URL.")
-
+        if not (url.startswith("https://") or url.startswith("http://")):
+            raise ValueError("URL must start with http:// or https://")
+        
+        # URL must be wrapped in inputs array
+        data = {"inputs": [{"url": url}]}
+        headers = {"Content-Type": "application/json"}
         headers.update(self._headers)
-        if isinstance(data, dict):
-            response = requests.post(
-                url=self._get_analyze_url(
-                    self._endpoint, self._api_version, analyzer_id
-                ),
-                headers=headers,
-                json=data,
-            )
-        else:
-            response = requests.post(
-                url=self._get_analyze_url(
-                    self._endpoint, self._api_version, analyzer_id
-                ),
-                headers=headers,
-                data=data,
-            )
-
-        response.raise_for_status()
+        
+        response = requests.post(
+            url=self._get_analyze_url(
+                self._endpoint, self._api_version, analyzer_id
+            ),
+            headers=headers,
+            json=data,
+        )
+        
+        self._raise_for_status_with_detail(response)
         self._logger.info(
-            f"Analyzing file {file_location} with analyzer: {analyzer_id}"
+            f"Analyzing URL {url} with analyzer: {analyzer_id}"
+        )
+        return response
+    
+    def begin_analyze_binary(self, analyzer_id: str, file_location: str) -> Response:
+        """
+        Begins the analysis of a single binary file using the specified analyzer.
+        Uses the :analyzeBinary endpoint required by GA API 2025-11-01.
+
+        Args:
+            analyzer_id (str): The ID of the analyzer to use.
+            file_location (str): The local path to the file to analyze.
+
+        Returns:
+            Response: The response from the analysis request.
+
+        Raises:
+            ValueError: If the file location is not a valid file path.
+            HTTPError: If the HTTP request returned an unsuccessful status code.
+        """
+        file_path = Path(file_location)
+        if not file_path.exists() or not file_path.is_file():
+            raise ValueError("File location must be a valid file path.")
+        
+        with open(file_location, "rb") as file:
+            file_bytes = file.read()
+        
+        headers = {"Content-Type": "application/octet-stream"}
+        headers.update(self._headers)
+        
+        response = requests.post(
+            url=self._get_analyze_binary_url(
+                self._endpoint, self._api_version, analyzer_id
+            ),
+            headers=headers,
+            data=file_bytes,
+        )
+        
+        self._raise_for_status_with_detail(response)
+        self._logger.info(
+            f"Analyzing binary file {file_location} with analyzer: {analyzer_id}"
         )
         return response
     
     def get_prebuilt_document_analyze_result(self, file_location: str) -> Dict[str, Any]:
-        response = self.begin_analyze(
+        # Use begin_analyze_binary for single file analysis
+        response = self.begin_analyze_binary(
             analyzer_id=self.PREBUILT_DOCUMENT_ANALYZER_ID,
             file_location=file_location,
         )
@@ -628,31 +796,38 @@ class AzureContentUnderstandingClient:
             await self.upload_jsonl_to_blob(
                 container_client, resources, storage_container_path_prefix + self.KNOWLEDGE_SOURCE_LIST_FILE_NAME)
 
-    def get_image_from_analyze_operation(
-        self, analyze_response: Response, image_id: str
+    def get_result_file(
+        self, analyze_response: Response, file_id: str
     ) -> Optional[bytes]:
-        """Retrieves an image from the analyze operation using the image ID.
+        """Retrieves a result file from the analyze operation using the file ID.
+        
+        This method can be used to retrieve various types of result files including:
+        - Key frame images (e.g., 'keyframes/1000')
+        - Face images (e.g., 'faces/{faceId}')
+        
         Args:
             analyze_response (Response): The response object from the analyze operation.
-            image_id (str): The ID of the image to retrieve.
+            file_id (str): The ID/path of the file to retrieve (e.g., 'keyframes/1000', 'faces/{faceId}').
         Returns:
-            bytes: The image content as a byte string.
+            bytes: The file content as a byte string, or None if retrieval fails.
         """
         operation_location = analyze_response.headers.get("operation-location", "")
         if not operation_location:
             raise ValueError(
                 "Operation location not found in the analyzer response header."
             )
-        operation_location = operation_location.split("?api-version")[0]
-        image_retrieval_url = (
-            f"{operation_location}/files/{image_id}?api-version={self._api_version}"
+        # Extract operation ID from operation-location
+        # Format: {endpoint}/contentunderstanding/analyzerResults/{operationId}?api-version={version}
+        operation_location_without_params = operation_location.split("?api-version")[0]
+        operation_id = operation_location_without_params.split("/")[-1]
+        
+        # Construct file retrieval URL according to TypeSpec: /analyzerResults/{operationId}/files/{+path}
+        file_retrieval_url = (
+            f"{self._endpoint}/contentunderstanding/analyzerResults/{operation_id}/files/{file_id}?api-version={self._api_version}"
         )
         try:
-            response = requests.get(url=image_retrieval_url, headers=self._headers)
-            response.raise_for_status()
-
-            assert response.headers.get("Content-Type") == "image/jpeg"
-
+            response = requests.get(url=file_retrieval_url, headers=self._headers)
+            self._raise_for_status_with_detail(response)
             return response.content
         except requests.exceptions.RequestException as e:
             print(f"HTTP request failed: {e}")
@@ -691,7 +866,7 @@ class AzureContentUnderstandingClient:
             headers=headers,
             json=classifier_schema,
         )
-        response.raise_for_status()
+        self._raise_for_status_with_detail(response)
         self._logger.info(f"Classifier {classifier_id} create request accepted.")
         return response
 
@@ -739,7 +914,7 @@ class AzureContentUnderstandingClient:
                 data=data,
             )
 
-        response.raise_for_status()
+        self._raise_for_status_with_detail(response)
         self._logger.info(
             f"Analyzing file {file_location} with classifier_id: {classifier_id}"
         )
@@ -783,7 +958,7 @@ class AzureContentUnderstandingClient:
                 )
 
             response = requests.get(operation_location, headers=self._headers)
-            response.raise_for_status()
+            self._raise_for_status_with_detail(response)
             status = response.json().get("status").lower()
             if status == "succeeded":
                 self._logger.info(

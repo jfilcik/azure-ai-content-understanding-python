@@ -2,10 +2,13 @@
 
 Welcome! Content Understanding is a solution that analyzes and comprehends various media content—including **documents, images, audio, and video**—and transforms it into structured, organized, and searchable data.
 
-- The samples in this repository default to the latest preview API version: **2025-05-01-preview**.
-- We will provide more samples for new functionalities in Preview.2 **2025-05-01-preview** soon.
-- As of May 2025, the **2025-05-01-preview** API version is available only in the regions listed in [Content Understanding region and language support](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/language-region-support).
-- To access sample code for version **2024-12-01-preview**, please check out the corresponding Git tag `2024-12-01-preview` or download it directly from the [release page](https://github.com/Azure-Samples/azure-ai-content-understanding-python/releases/tag/2024-12-01-preview).
+Content Understanding is now a Generally Available (GA) service with the release of the `2025-11-01` API version. 
+
+- The samples in this repository default to the latest GA API version: `2025-11-01`.
+- We will provide more samples for new functionalities in the GA API versions soon. For details on the updates in the current GA release, see the [Content Understanding What's New Document page](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/whats-new).
+- As of November 2025, the `2025-11-01` API version is now available in a broader range of [regions](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/language-region-support).
+- To access sample code for version `2025-05-01-preview`, please check out the corresponding Git tag `2025-05-01-preview` or download it directly from the [release page](https://github.com/Azure-Samples/azure-ai-content-understanding-python/releases/tag/2025-05-01-preview).
+- To access sample code for version `2024-12-01-preview`, please check out the corresponding Git tag `2024-12-01-preview` or download it directly from the [release page](https://github.com/Azure-Samples/azure-ai-content-understanding-python/releases/tag/2024-12-01-preview).
 
 👉 If you are looking for **.NET samples**, check out [this repo](https://github.com/Azure-Samples/azure-ai-content-understanding-dotnet/).
 
@@ -81,64 +84,107 @@ After clicking the link above, follow these steps to set up the Codespace:
 
 ## Configure Azure AI Service Resource
 
-### (Option 1) Use `azd` Commands to Automatically Create Temporary Resources and Run Samples
+### Step 1: Create Azure AI Foundry Resource
 
-1. Ensure you have permission to grant roles within your subscription.
-2. Log in to Azure:
+First, create an Azure AI Foundry resource that will host both the Content Understanding service and the required model deployments.
 
-    ```bash
-    azd auth login
-    ```
+1. Follow the steps in the [Azure Content Understanding documentation](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/) to create an Azure AI Foundry resource
+2. Get your Foundry resource's endpoint URL from Azure Portal:
+   - Go to [Azure Portal](https://portal.azure.com/)
+   - Navigate to your Azure AI Foundry resource
+   - Go to **Resource Management** > **Keys and Endpoint**
+   - Copy the **Endpoint** URL (typically `https://<your-resource-name>.services.ai.azure.com/`)
 
-    If this command doesn’t work, try the device code login:
+**⚠️ Important: Grant Required Permissions**
 
-    ```bash
-    azd auth login --use-device-code
-    ```
+After creating your Azure AI Foundry resource, you must grant yourself the **Cognitive Services User** role to enable API calls for setting default GPT deployments:
 
-3. Set up the environment by following the prompts to choose your location:
+1. Go to [Azure Portal](https://portal.azure.com/)
+2. Navigate to your Azure AI Foundry resource
+3. Go to **Access Control (IAM)** in the left menu
+4. Click **Add** > **Add role assignment**
+5. Select the **Cognitive Services User** role
+6. Assign it to yourself (or the user/service principal that will run the samples)
 
-    ```bash
-    azd up
-    ```
+> **Note:** This role assignment is required even if you are the owner of the resource. Without this role, you will not be able to call the Content Understanding API to configure model deployments for prebuilt analyzers.
 
-### (Option 2) Manually Create Resources and Set Environment Variables
+### Step 2: Deploy Required Models
 
-1. Create an [Azure AI Services resource](docs/create_azure_ai_service.md).
-2. Go to the resource’s **Access Control (IAM)** and assign yourself the role **Cognitive Services User**.  
-   - This is necessary even if you are the owner of the resource.
-3. Copy the sample environment file:
+**⚠️ Important:** The prebuilt analyzers require model deployments. You must deploy these models before using prebuilt analyzers:
+- `prebuilt-documentSearch`, `prebuilt-audioSearch`, `prebuilt-videoSearch` require **GPT-4.1-mini** and **text-embedding-3-large**
+- Other prebuilt analyzers like `prebuilt-invoice`, `prebuilt-receipt` require **GPT-4.1** and **text-embedding-3-large**
+
+1. **Deploy GPT-4.1:**
+   - In Azure AI Foundry, go to **Deployments** > **Deploy model** > **Deploy base model**
+   - Search for and select **gpt-4.1**
+   - Complete the deployment with your preferred settings
+   - Note the deployment name (by convention, use `gpt-4.1`)
+
+2. **Deploy GPT-4.1-mini:**
+   - In Azure AI Foundry, go to **Deployments** > **Deploy model** > **Deploy base model**
+   - Search for and select **gpt-4.1-mini**
+   - Complete the deployment with your preferred settings
+   - Note the deployment name (by convention, use `gpt-4.1-mini`)
+
+3. **Deploy text-embedding-3-large:**
+   - In Azure AI Foundry, go to **Deployments** > **Deploy model** > **Deploy base model**
+   - Search for and select **text-embedding-3-large**
+   - Complete the deployment with your preferred settings
+   - Note the deployment name (by convention, use `text-embedding-3-large`)
+
+For more information on deploying models, see [Deploy models in Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-studio/how-to/deploy-models-openai).
+
+### Step 3: Configure Environment Variables
+
+Choose one of the following options to configure your environment:
+
+#### Set Environment Variables with Token Authentication (Recommended)
+
+> **💡 Recommended:** This approach uses Azure Active Directory (AAD) token authentication, which is safer and strongly recommended for production environments. You do **not** need to set `AZURE_AI_API_KEY` in your `.env` file when using this method.
+
+1. Copy the sample environment file:
 
     ```bash
     cp notebooks/.env.sample notebooks/.env
     ```
 
-4. Open `notebooks/.env` and fill in `AZURE_AI_ENDPOINT` with the endpoint URL from your Azure AI Services resource.
-5. Log in to Azure:
+2. Open `notebooks/.env` and fill in the required values. Replace `<your-resource-name>` with your actual resource name. If you used different deployment names in Step 2, update the deployment variables accordingly:
+
+    ```env
+    AZURE_AI_ENDPOINT=https://<your-resource-name>.services.ai.azure.com/
+    GPT_4_1_DEPLOYMENT=gpt-4.1
+    GPT_4_1_MINI_DEPLOYMENT=gpt-4.1-mini
+    TEXT_EMBEDDING_3_LARGE_DEPLOYMENT=text-embedding-3-large
+    ```
+
+3. Log in to Azure:
 
     ```bash
     azd auth login
     ```
 
-### (Option 3) Use Endpoint and API Key (No `azd` Required)
+#### Set Environment Variables with API Key (Alternative)
 
-> ⚠️ **Note:** Using a subscription key works, but using a token provider with Azure Active Directory (AAD) is safer and strongly recommended for production environments.
 
-1. Create an [Azure AI Services resource](docs/create_azure_ai_service.md).
-2. Copy the sample environment file:
+1. Copy the sample environment file:
 
     ```bash
     cp notebooks/.env.sample notebooks/.env
     ```
 
-3. Edit `notebooks/.env` and set your credentials:
+2. Edit `notebooks/.env` and set your credentials. 
+- Replace `<your-resource-name>` and `<your-azure-ai-api-key>` with your actual values. These can be found in your AI Services resource under **Resource Management** > **Keys and Endpoint**. 
+- If you used different deployment names in Step 2, update the deployment variables accordingly:
 
     ```env
     AZURE_AI_ENDPOINT=https://<your-resource-name>.services.ai.azure.com/
     AZURE_AI_API_KEY=<your-azure-ai-api-key>
+    GPT_4_1_DEPLOYMENT=gpt-4.1
+    GPT_4_1_MINI_DEPLOYMENT=gpt-4.1-mini
+    TEXT_EMBEDDING_3_LARGE_DEPLOYMENT=text-embedding-3-large
     ```
 
-    Replace `<your-resource-name>` and `<your-azure-ai-api-key>` with your actual values. These can be found in your AI Services resource under **Resource Management** > **Keys and Endpoint**.
+> ⚠️ **Note:** If you skip the token authentication step above, you must set `AZURE_AI_API_KEY` in your `.env` file. Get your API key from Azure Portal by navigating to your Foundry resource > **Resource Management** > **Keys and Endpoint**.
 
 ## Open a Jupyter Notebook and Follow Step-by-Step Guidance
 
@@ -161,16 +207,15 @@ Azure AI Content Understanding is a new Generative AI-based [Azure AI service](h
 
 | File                                      | Description                                                                                                                                                                                                                                                                                          |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [content_extraction.ipynb](notebooks/content_extraction.ipynb)           | Demonstrates how the Content Understanding API can extract semantic information from your files—for example, OCR with tables in documents, audio transcription, and face analysis in videos.                                                                                                   |
+| [content_extraction.ipynb](notebooks/content_extraction.ipynb)           | **Recommended starting point.** Demonstrates how the Content Understanding API can extract semantic information from your files—for example, OCR with tables in documents, audio transcription, and face analysis in videos.                                                                                                   |
 | [field_extraction.ipynb](notebooks/field_extraction.ipynb)               | Shows how to create an analyzer to extract fields from your files—e.g., invoice amounts in documents, counting people in images, names mentioned in audio, or summarizing videos. Customize fields by creating your own analyzer template.                                                        |
-| [field_extraction_pro_mode.ipynb](notebooks/field_extraction_pro_mode.ipynb) | Demonstrates **Pro mode** in Azure AI Content Understanding, enhancing analyzers with multiple inputs and optional reference data. Pro mode is designed for advanced use cases requiring multi-step reasoning and complex decision-making, such as identifying inconsistencies and drawing inferences. |
 | [classifier.ipynb](notebooks/classifier.ipynb)                           | Demonstrates how to (1) create a classifier to categorize documents, (2) create a custom analyzer to extract specific fields, and (3) combine classifiers and analyzers to classify, optionally split, and analyze documents using a flexible processing pipeline.                                 |
-| [conversational_field_extraction.ipynb](notebooks/conversational_field_extraction.ipynb) | Shows how to efficiently evaluate conversational audio data previously transcribed with Content Understanding or Azure AI Speech. Enables re-analysis of data cost-effectively. Based on the [field_extraction.ipynb](notebooks/field_extraction.ipynb) sample.                                   |
 | [analyzer_training.ipynb](notebooks/analyzer_training.ipynb)             | Demonstrates how to improve field extraction performance by training the API with a few labeled samples. *(Note: This feature is currently available only for document scenarios.)*                                                                                                               |
 | [management.ipynb](notebooks/management.ipynb)                           | Demonstrates creating a minimal analyzer, listing all analyzers in your resource, and deleting analyzers you no longer need.                                                                                                                                                                      |
-| [build_person_directory.ipynb](notebooks/build_person_directory.ipynb)   | Shows how to enroll people’s faces from images and build a Person Directory.                                                                                                                                                                                                                        |
 
 ## More Samples Using Azure Content Understanding
+
+> **Note:** The following samples are currently targeting Preview.2 (API version `2025-05-01-preview`) and will be updated to the GA API version (`2025-11-01`) soon.
 
 - [Azure Search with Content Understanding](https://github.com/Azure-Samples/azure-ai-search-with-content-understanding-python)
 - [Azure Content Understanding with OpenAI](https://github.com/Azure-Samples/azure-ai-content-understanding-with-azure-openai-python)
