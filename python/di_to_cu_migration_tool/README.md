@@ -27,8 +27,26 @@ Here is a detailed breakdown of the three CLI tools and their functionality:
 * **call_analyze.py**  
     * This CLI tool verifies that the migration completed successfully and assesses the quality of the created analyzer.
 
+
 ## Setup
 
+## Prerequisites
+
+⚠️ **IMPORTANT: Before using this migration tool**, ensure your Azure AI Foundry resource is properly configured for Content Understanding:
+
+1. **Configure Default Model Deployments**: You must set default model deployments in your Content Understanding in your Foundry Resource before creating or running analyzers. 
+   
+   To do this walk through the prerequisites here:
+   - [REST API Quickstart Guide](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/quickstart/use-rest-api?tabs=portal%2Cdocument)
+
+  For more details about defaults checkout this documentation:
+   - [Models and Deployments Documentation](https://learn.microsoft.com/en-us/azure/ai-services/content-understanding/concepts/models-deployments)
+
+2. **Verify you can create and use a basic Content Understanding analyzer** in your Azure AI Foundry resource before attempting migration. This ensures all prerequisites are met.
+
+3. Complete all setup steps outlined in the REST API documentation above, including authentication and model deployment configuration.
+
+### Tool Setup
 Please follow these steps to set up the tool:
 
 1. Install dependencies by running:  
@@ -102,9 +120,6 @@ If migrating a _DI 3.1/4.0 GA Custom Extraction_ dataset, please run:
 python ./di_to_cu_converter.py --DI-version neural --analyzer-prefix mySampleAnalyzer \
 --source-container-sas-url "https://sourceStorageAccount.blob.core.windows.net/sourceContainer?sourceSASToken" --source-blob-folder diDatasetFolderName \
 --target-container-sas-url "https://targetStorageAccount.blob.core.windows.net/targetContainer?targetSASToken" --target-blob-folder cuDatasetFolderName
-
-python ./di_to_cu_converter.py --DI-version neural --analyzer-prefix mySampleAnalyzer --source-container-sas-url "https://jfilcikditestdata.blob.core.windows.net/didata?sv=2025-07-05&spr=https&st=2025-12-16T22%3A17%3A06Z&se=2025-12-17T22%3A17%3A06Z&sr=c&sp=rl&sig=nvUIelZQ9yWEJx3jA%2FjUOIdHn6OVnp5gvKSJ3zgzwvE%3D" --source-blob-folder diDatasetFolderName \
---target-container-sas-url "https://jfilcikditestdata.blob.core.windows.net/cudata?sv=2025-07-05&spr=https&st=2025-12-16T22%3A19%3A39Z&se=2025-12-17T22%3A19%3A39Z&sr=c&sp=racwl&sig=K82dxEFNpYhuf5JRq3xJ4vc5SYE8A7FfsBnTJbB1VJY%3D" --target-blob-folder cuDatasetFolderName
 ```
 
 For this migration, specifying an analyzer prefix is crucial for creating a CU analyzer. Since the fields.json does not define a "doc_type" for identification, the created analyzer ID will be the specified analyzer prefix.
@@ -127,9 +142,9 @@ After converting the CU analyzer.json, please run:
 
 ```
 python ./create_analyzer.py \
---analyzer-sas-url "https://jfilcikditestdata.blob.core.windows.net/cudata?sv=2025-07-05&spr=https&st=2025-12-16T22%3A19%3A39Z&se=2025-12-17T22%3A19%3A39Z&sr=c&sp=racwl&sig=K82dxEFNpYhuf5JRq3xJ4vc5SYE8A7FfsBnTJbB1VJY%3D" \
---target-container-sas-url "https://jfilcikditestdata.blob.core.windows.net/cudata?sv=2025-07-05&spr=https&st=2025-12-16T22%3A19%3A39Z&se=2025-12-17T22%3A19%3A39Z&sr=c&sp=racwl&sig=K82dxEFNpYhuf5JRq3xJ4vc5SYE8A7FfsBnTJbB1VJY%3D" \
---target-blob-folder "di_convert"
+--analyzer-sas-url "https://targetStorageAccount.blob.core.windows.net/targetContainer/cuDatasetFolderName/analyzer.json?targetSASToken" \
+--target-container-sas-url "https://targetStorageAccount.blob.core.windows.net/targetContainer?targetSASToken" \
+--target-blob-folder cuDatasetFolderName
 ```
 
 The `analyzer.json` file is located in the specified target blob container and folder. Please obtain the SAS URL for `analyzer.json` from there.
