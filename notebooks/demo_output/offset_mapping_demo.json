@@ -1,0 +1,180 @@
+{
+  "pages": [
+    {
+      "pageNumber": 3,
+      "offset": {
+        "start": 1,
+        "end": 242
+      },
+      "lines": [
+        {
+          "content": "1 | INDEX",
+          "offset": {
+            "start": 17,
+            "end": 26
+          },
+          "bbox": "D(3,0.1994,0.5888,2.1336,0.5585,2.1471,0.9648,0.2128,0.9951)",
+          "words": [
+            {
+              "content": "1",
+              "offset": {
+                "start": 17,
+                "end": 18
+              },
+              "bbox": "D(3,0.1994,0.5888,0.3995,0.5750,0.3995,0.9060,0.1475,0.9063)",
+              "originalOffset": 200
+            },
+            {
+              "content": "INDEX",
+              "offset": {
+                "start": 21,
+                "end": 26
+              },
+              "bbox": "D(3,0.5336,0.5585,2.1336,0.5585,2.1471,0.9648,0.5471,0.9951)",
+              "originalOffset": 205
+            }
+          ]
+        },
+        {
+          "content": "2 | WITNESS: DIRECT CROSS REDIRECT RECROSS",
+          "offset": {
+            "start": 27,
+            "end": 69
+          },
+          "bbox": "D(3,0.1994,1.0888,8.1336,1.0585,8.1471,1.4648,0.2128,1.4951)",
+          "words": [
+            {
+              "content": "2",
+              "offset": {
+                "start": 27,
+                "end": 28
+              },
+              "bbox": "D(3,0.1994,1.0888,0.3995,1.0750,0.3995,1.4060,0.1475,1.4063)",
+              "originalOffset": 211
+            },
+            {
+              "content": "WITNESS:",
+              "offset": {
+                "start": 32,
+                "end": 40
+              },
+              "bbox": "D(3,0.5336,1.0585,2.5336,1.0585,2.5471,1.4648,0.5471,1.4951)",
+              "originalOffset": 215
+            }
+          ]
+        },
+        {
+          "content": "3 | Susan Michaud",
+          "offset": {
+            "start": 70,
+            "end": 87
+          },
+          "bbox": "D(3,0.1994,1.5888,5.1336,1.5585,5.1471,1.9648,0.2128,1.9951)",
+          "words": [
+            {
+              "content": "3",
+              "offset": {
+                "start": 70,
+                "end": 71
+              },
+              "bbox": "D(3,0.1994,1.5888,0.3995,1.5750,0.3995,1.9060,0.1475,1.9063)",
+              "originalOffset": 230
+            },
+            {
+              "content": "Susan",
+              "offset": {
+                "start": 75,
+                "end": 80
+              },
+              "bbox": "D(3,0.5336,1.5585,1.8336,1.5585,1.8471,1.9648,0.5471,1.9951)",
+              "originalOffset": 235
+            },
+            {
+              "content": "Michaud",
+              "offset": {
+                "start": 81,
+                "end": 88
+              },
+              "bbox": "D(3,1.9336,1.5585,3.5336,1.5585,3.5471,1.9648,1.9471,1.9951)",
+              "originalOffset": 241
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "pageNumber": 4,
+      "offset": {
+        "start": 244,
+        "end": 500
+      },
+      "lines": [
+        {
+          "content": "1 | Susan Michaud, M-I-C-H-A-U-D, sworn by the Notary Public,",
+          "offset": {
+            "start": 260,
+            "end": 321
+          },
+          "bbox": "D(4,0.1994,0.5888,12.1336,0.5585,12.1471,0.9648,0.2128,0.9951)",
+          "words": [
+            {
+              "content": "1",
+              "offset": {
+                "start": 260,
+                "end": 261
+              },
+              "bbox": "D(4,0.1994,0.5888,0.3995,0.5750,0.3995,0.9060,0.1475,0.9063)",
+              "originalOffset": 1000
+            },
+            {
+              "content": "Susan",
+              "offset": {
+                "start": 265,
+                "end": 270
+              },
+              "bbox": "D(4,0.5336,0.5585,1.8336,0.5585,1.8471,0.9648,0.5471,0.9951)",
+              "originalOffset": 1005
+            },
+            {
+              "content": "Michaud,",
+              "offset": {
+                "start": 271,
+                "end": 279
+              },
+              "bbox": "D(4,1.9336,0.5585,3.5336,0.5585,3.5471,0.9648,1.9471,0.9951)",
+              "originalOffset": 1011
+            }
+          ]
+        },
+        {
+          "content": "2 | testified as follows.",
+          "offset": {
+            "start": 322,
+            "end": 347
+          },
+          "bbox": "D(4,0.1994,1.0888,6.1336,1.0585,6.1471,1.4648,0.2128,1.4951)",
+          "words": [
+            {
+              "content": "2",
+              "offset": {
+                "start": 322,
+                "end": 323
+              },
+              "bbox": "D(4,0.1994,1.0888,0.3995,1.0750,0.3995,1.4060,0.1475,1.4063)",
+              "originalOffset": 1050
+            },
+            {
+              "content": "testified",
+              "offset": {
+                "start": 327,
+                "end": 336
+              },
+              "bbox": "D(4,0.5336,1.0585,2.5336,1.0585,2.5471,1.4648,0.5471,1.4951)",
+              "originalOffset": 1055
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

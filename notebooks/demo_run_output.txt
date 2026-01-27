@@ -1,0 +1,122 @@
+
+🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 
+  LEGAL TRANSCRIPT OFFSET TRACKING DEMONSTRATION
+  Enhanced Reflow Implementation for Azure Content Understanding
+🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 🎯 
+
+📋 Overview:
+   This demo shows how the enhanced reflow implementation maintains
+   accurate offsets for words, lines, and pages in legal transcripts.
+
+   Benefits:
+   • ✅ Precise page/line citations for AI-generated summaries
+   • ✅ Accurate source highlighting using offsets and bounding boxes
+   • ✅ Traceability between reflowed content and original OCR positions
+
+================================================================================
+  🧪 OFFSET ACCURACY TEST
+================================================================================
+
+📄 Testing Page 3...
+  ✅ Line 1 [17:26]: PASS
+     Content: '1 | INDEX'
+  ✅ Line 2 [27:69]: PASS
+     Content: '2 | WITNESS: DIRECT CROSS REDIRECT RECROSS'
+  ✅ Line 3 [70:87]: PASS
+     Content: '3 | Susan Michaud'
+
+📄 Testing Page 4...
+  ✅ Line 1 [260:321]: PASS
+     Content: '1 | Susan Michaud, M-I-C-H-A-U-D, sworn by the Not...'
+  ✅ Line 2 [322:347]: PASS
+     Content: '2 | testified as follows.'
+
+📊 Results: 5/5 tests passed (100%)
+
+================================================================================
+  📝 WORD-LEVEL OFFSET DEMONSTRATION
+================================================================================
+
+📄 Page 3, First Line:
+   Full line: '1 | INDEX'
+   Line offset: [17:26]
+
+   Word-level breakdown:
+     • '1' @ [17:18]
+       Extracted: '1'
+       Match: ✅
+       BBox: D(3,0.1994,0.5888,0.3995,0.5750,0.3995,0.9060,0.14...
+       Original OCR offset: 200
+     • 'INDEX' @ [21:26]
+       Extracted: 'INDEX'
+       Match: ✅
+       BBox: D(3,0.5336,0.5585,2.1336,0.5585,2.1471,0.9648,0.54...
+       Original OCR offset: 205
+
+================================================================================
+  📖 CITATION USE CASE DEMONSTRATION
+================================================================================
+
+🎯 Use Case: AI Agent Creating Deposition Summary with Citations
+
+Scenario: An AI agent needs to cite where Susan Michaud's testimony begins.
+
+1. AI Agent Query: 'Where does Susan Michaud's testimony begin?'
+
+2. System Lookup:
+   - Page: 4
+   - Line offset: [260:321]
+   - Content: '1 | Susan Michaud, M-I-C-H-A-U-D, sworn by the Notary Public,'
+
+3. AI Agent Response:
+   'Susan Michaud's testimony begins on Page 4, Line 1:'
+   "1 | Susan Michaud, M-I-C-H-A-U-D, sworn by the Notary Public,"
+
+4. Verification: Text extracted using offset matches exactly ✅
+
+================================================================================
+  🎨 SOURCE HIGHLIGHTING USE CASE DEMONSTRATION
+================================================================================
+
+🎯 Use Case: Highlighting 'Susan Michaud' in the Original Document
+
+1. Target: Highlight 'Susan Michaud' on Page 4
+
+2. Word 1: 'Susan'
+   - Reflowed offset: [265:270]
+   - Original OCR offset: 1005
+   - Bounding box: D(4,0.5336,0.5585,1.8336,0.5585,1.8471,0.9648,0.5471,0.9951)
+
+3. Word 2: 'Michaud,'
+   - Reflowed offset: [271:279]
+   - Original OCR offset: 1011
+   - Bounding box: D(4,1.9336,0.5585,3.5336,0.5585,3.5471,0.9648,1.9471,0.9951)
+
+4. Highlighting Steps:
+   a. Parse bounding boxes to get coordinates
+   b. Draw highlight rectangles on PDF at those coordinates
+   c. Result: Precise highlighting of 'Susan Michaud' on the page ✅
+
+================================================================================
+  💾 EXPORT OFFSET MAPPING
+================================================================================
+
+💾 Offset mapping exported to: /home/runner/work/azure-ai-content-understanding-python/azure-ai-content-understanding-python/notebooks/demo_output/offset_mapping_demo.json
+
+================================================================================
+  ✅ DEMONSTRATION COMPLETE
+================================================================================
+
+📝 Summary:
+   1. Offset tracking works correctly - all tests passed ✅
+   2. Word-level offsets enable precise text extraction ✅
+   3. Citations can reference exact page/line numbers ✅
+   4. Bounding boxes enable accurate source highlighting ✅
+
+📚 Next Steps:
+   1. Open 'legal_transcript_reflow.ipynb' to see the full implementation
+   2. Run the notebook to process your own legal transcripts
+   3. Use the offset mappings for AI summaries and highlighting
+
+================================================================================
+
